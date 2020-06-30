@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="5b26fcf7-0bca-4750-9963-e0c52d6dcc4d" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<http:request-config name="HTTP_Request_configuration" doc:name="HTTP Request configuration" doc:id="ab0d4628-ed34-4214-a5e7-05c361498610" >
+		<http:request-connection host="localhost" port="8082" />
+	</http:request-config>
+	<http:request-config name="HTTP_Request_configuration1" doc:name="HTTP Request configuration" doc:id="98a787b6-6fe1-4d61-9907-09bb9eaa786f" >
+		<http:request-connection host="localhost" port="8083" />
+	</http:request-config>
+	<flow name="day7-assignmentFlow" doc:id="f3a06b81-e2aa-40ea-a30c-87c0e79f8e93" >
+		<http:listener doc:name="Listener" doc:id="58dc703e-efdc-4561-85e5-1fc6211c9d59" config-ref="HTTP_Listener_config" path="/getDoctorsAndPatients"/>
+		<http:request method="GET" doc:name="Patients Request" doc:id="7fc5b202-41a5-44b5-bc29-25c4a3e9bb40" config-ref="HTTP_Request_configuration" path="/patients/">
+			<error-mapping sourceType="HTTP:CONNECTIVITY" targetType="APP1:APP1" />
+			
+		</http:request>
+		<logger level="INFO" doc:name="Logger" doc:id="132413e4-f5cc-4daa-9db4-481ddf76cb41" message="#[payload]"/>
+		<set-variable value="#[payload]" doc:name="Set Variable" doc:id="d0549cc2-7c49-43c2-836b-7eef8ee2105d" variableName="patients"/>
+		<ee:transform doc:name="Transform Message" doc:id="42f14ce6-cd81-46e8-9fd3-cab32e5d81d2">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	patientsList: vars.patients
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<http:request method="GET" doc:name="Doctors Request" doc:id="c344aac2-f9b0-4748-86f9-8af218c7ae3e" config-ref="HTTP_Request_configuration1" path="/doctors/">
+			<error-mapping sourceType="HTTP:CONNECTIVITY" targetType="APP2:APP2" />
+		</http:request>
+		<logger level="INFO" doc:name="Logger" doc:id="b8d30f5c-926d-4d92-9cb3-41b0db476ddf" message="#[payload]"/>
+		<set-variable value="#[payload]" doc:name="Set Variable" doc:id="07dadc7a-ff67-4d40-af34-8405b3c422a7" variableName="doctors"/>
+		<ee:transform doc:name="Transform Message" doc:id="00ae7d63-e0e1-4bab-9bfe-f375e5c8d949">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	doctorsList : vars.doctors,
+	patientsList: vars.patients
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<error-handler>
+			<on-error-continue enableNotifications="true" logException="true" doc:name="On Error Continue" doc:id="aca02c05-6b0e-4f7a-a6f3-f31f73b2b519" type="APP1:APP1">
+				<logger level="INFO" doc:name="Logger" doc:id="914045e2-9c0c-433b-a1e9-9753ee355a87" message="#[payload]"/>
+			</on-error-continue>
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="1f962d9b-b7d9-40e4-8e3c-2ce7f777295c" type="APP2:APP2">
+				<logger level="INFO" doc:name="Logger" doc:id="5e398860-d8c4-4488-8740-1765c3ba8f62" message="#[payload]"/>
+				<ee:transform doc:name="Transform Message" doc:id="ff2b1737-b264-4b50-9663-11392922b231" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"exceptionMessage" : "Doctor Service Unavailable"
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+		</error-handler>
+	</flow>
+</mule>
